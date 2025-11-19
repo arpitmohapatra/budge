@@ -5,11 +5,16 @@ import { VitePWA } from 'vite-plugin-pwa'
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/budge/',
+  publicDir: 'public',
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon/favicon.ico', 'favicon/apple-touch-icon.png', 'favicon/favicon-16x16.png', 'favicon/favicon-32x32.png'],
+      devOptions: {
+        enabled: true,
+        type: 'module'
+      },
+      includeAssets: ['favicon/*.png', 'favicon/*.ico'],
       manifest: {
         name: 'Budge - Budget & Subscription Tracker',
         short_name: 'Budge',
@@ -17,6 +22,8 @@ export default defineConfig({
         theme_color: '#6366f1',
         background_color: '#ffffff',
         display: 'standalone',
+        start_url: '/budge/',
+        scope: '/budge/',
         icons: [
           {
             src: '/budge/favicon/android-chrome-192x192.png',
