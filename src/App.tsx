@@ -1,17 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Onboarding } from './components/Onboarding';
-import { Dashboard } from './components/Dashboard';
+import { EnhancedDashboard } from './components/EnhancedDashboard';
 import { SubscriptionList } from './components/SubscriptionList';
 import { SubscriptionForm } from './components/SubscriptionForm';
+import { TransactionsView } from './components/TransactionsView';
+import { AnalyticsView } from './components/AnalyticsView';
+import { BudgetCard } from './components/BudgetCard';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { useProfile } from './hooks/useProfile';
 import { useSubscriptions } from './hooks/useSubscriptions';
 import { useAlerts } from './hooks/useAlerts';
-import { Subscription } from './types';
+import { useTransactions } from './hooks/useTransactions';
+import { useCategories } from './hooks/useCategories';
+import { useBudgets } from './hooks/useBudgets';
+import { useAnalytics } from './hooks/useAnalytics';
+import { Subscription, Transaction, TransactionFilters } from './types';
 import { addTransaction, generateId } from './db';
 
-type View = 'dashboard' | 'subscriptions';
+type View = 'dashboard' | 'transactions' | 'subscriptions' | 'analytics';
 
 function App() {
   const { profile, loading: profileLoading, createProfile } = useProfile();
@@ -24,12 +31,25 @@ function App() {
     markAsPaid,
   } = useSubscriptions();
   const { alerts, dismissAlert } = useAlerts(subscriptions);
+  const { categories, loading: categoriesLoading, initializeDefaultCategories } = useCategories();
+  useBudgets();
+  const { summary, categorySpending } = useAnalytics();
+
+  const [filters, setFilters] = useState<TransactionFilters>({});
+  const { transactions, createTransaction, editTransaction, removeTransaction } = useTransactions(filters);
 
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [showSubForm, setShowSubForm] = useState(false);
   const [editingSubId, setEditingSubId] = useState<string | null>(null);
 
-  const loading = profileLoading || subsLoading;
+  const loading = profileLoading || subsLoading || categoriesLoading;
+
+  // Initialize default categories on first load
+  useEffect(() => {
+    if (profile && categories.length === 0 && !categoriesLoading) {
+      initializeDefaultCategories();
+    }
+  }, [profile, categories.length, categoriesLoading]);
 
   // Show onboarding if no profile
   if (loading) {
@@ -52,6 +72,10 @@ function App() {
       />
     );
   }
+
+  const handleAddTransaction = () => {
+    setCurrentView('transactions');
+  };
 
   const handleAddSubscription = () => {
     setEditingSubId(null);
@@ -92,6 +116,7 @@ function App() {
         type: 'subscription',
         amount: subscription.amount,
         description: `${subscription.name} - ${subscription.billingCycle} payment`,
+        category: subscription.category,
         subscriptionId: id,
         date: new Date(),
         createdAt: new Date(),
@@ -99,6 +124,20 @@ function App() {
 
       // Update next payment date
       await markAsPaid(id);
+    }
+  };
+
+  const handleSaveTransaction = (data: Omit<Transaction, 'id' | 'createdAt'>) => {
+    createTransaction(data);
+  };
+
+  const handleEditTransaction = (id: string, data: Partial<Transaction>) => {
+    editTransaction(id, data);
+  };
+
+  const handleDeleteTransaction = (id: string) => {
+    if (confirm('Are you sure you want to delete this transaction?')) {
+      removeTransaction(id);
     }
   };
 
@@ -112,13 +151,28 @@ function App() {
 
       <main className="container mx-auto px-4 py-6 max-w-4xl">
         {currentView === 'dashboard' && (
-          <Dashboard
+          <EnhancedDashboard
             profile={profile}
             subscriptions={subscriptions}
             alerts={alerts}
+            monthlySummary={summary}
             onDismissAlert={dismissAlert}
+            onAddTransaction={handleAddTransaction}
             onAddSubscription={handleAddSubscription}
             onEditSubscription={handleEditSubscription}
+          />
+        )}
+
+        {currentView === 'transactions' && (
+          <TransactionsView
+            transactions={transactions}
+            categories={categories}
+            currency={profile.currency}
+            onSave={handleSaveTransaction}
+            onEdit={handleEditTransaction}
+            onDelete={handleDeleteTransaction}
+            filters={filters}
+            onFilterChange={setFilters}
           />
         )}
 
@@ -136,6 +190,36 @@ function App() {
               onEdit={handleEditSubscription}
               onMarkAsPaid={handleMarkAsPaid}
             />
+          </div>
+        )}
+
+        {currentView === 'analytics' && (
+          <div className="space-y-6">
+            <AnalyticsView summary={summary} currency={profile.currency} />
+
+            {/* Budget Overview */}
+            {categorySpending.length > 0 && (
+              <div>
+                <h2 className="text-xl font-bold mb-4">Budget Overview</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {categorySpending.map((spending) => {
+                    const category = categories.find(c => c.id === spending.categoryId);
+                    if (!category) return null;
+
+                    return (
+                      <BudgetCard
+                        key={spending.categoryId}
+                        category={category}
+                        budgetAmount={spending.budgetLimit}
+                        spentAmount={spending.amount}
+                        currency={profile.currency}
+                        transactionCount={spending.transactionCount}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
