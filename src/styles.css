@@ -438,3 +438,40 @@ button.legend-row:hover { background: var(--surface-2); } .legend-row[aria-press
   .ob-card { padding: 26px 20px; }
   .li.bl { flex-wrap: wrap; } .li.bl > span:last-child { min-width: 0; }
 }
+
+/* ═══════════════ Safari / WebKit form-control normalisation ═══════════════ */
+.field input, .field select, .field textarea { -webkit-appearance: none; appearance: none; border-radius: 12px; }
+.field input, .field select { height: 46px; }
+.field select {
+  padding-right: 40px; background-repeat: no-repeat; background-position: right 14px center; background-size: 14px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238b8b9a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+.field input[type="date"] { display: block; min-width: 0; text-align: left; line-height: 1.2; background-image: none; }
+.field input[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; min-height: 1.2em; }
+.field input[type="date"]::-webkit-calendar-picker-indicator { opacity: .55; cursor: pointer; }
+.field input[type="date"]::-webkit-datetime-edit { padding: 0; }
+.field input[type="date"]::-webkit-inner-spin-button, .field input::-webkit-outer-spin-button { display: none; }
+.money-input > span { font-size: 15px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a9b0c0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); } }
+:root[data-theme="dark"] .field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a9b0c0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
+
+/* Budget rows */
+.li.bl .body { gap: 6px; }
+.bl-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; min-width: 0; }
+.bl-top .t { min-width: 0; }
+.bl-amt { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.bl-pill { min-width: 84px; text-align: right; }
+.stats.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.card-head { flex-wrap: wrap; row-gap: 6px; }
+
+@media (max-width: 900px) {
+  .bl-top { flex-direction: column; align-items: flex-start; gap: 0; }
+  .bl-pill { min-width: 0; }
+  .li.bl { flex-wrap: nowrap; }
+  .stats.three .stat { padding: 14px 12px; min-width: 0; }
+  .stats.three .stat:nth-child(3) { border-left: 1px solid var(--line-2); }
+  .stats.three .stat:nth-child(n+3) { border-top: 0; }
+  .stats.three .stat .v { font-size: 19px; letter-spacing: -.03em; }
+  .stats.three .stat .eyebrow { font-size: 10px; }
+  .legend { gap: 10px; }
+}

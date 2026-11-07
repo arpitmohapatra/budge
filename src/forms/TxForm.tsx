@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Check, Trash2 } from 'lucide-react';
 import { Icon } from '../ui/Icon';
-import { BigAmount, Field, Sheet, Seg, num } from '../ui/kit';
+import { BigAmount, DateInput, Field, Sheet, Seg, num } from '../ui/kit';
 import { accountsFor, deleteTransaction, useApp } from '../lib/store';
 import { primaryAccount, uid } from '../lib/ledger';
 import type { Account, Transaction, TxType } from '../lib/types';
@@ -108,10 +108,10 @@ export default function TxForm({ id, preset }: { id?: string; preset?: { type?: 
                 <AccountSelect value={toId} onChange={setToId} accounts={accts.filter((a) => a.id !== accountId)} allowNone noneLabel="Choose account…" />
               </Field>
             ) : (
-              <Field label="Date"><input type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} /></Field>
+              <Field label="Date"><DateInput value={date} max={today} onChange={setDate} /></Field>
             )}
           </div>
-          {type === 'transfer' && <Field label="Date"><input type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} /></Field>}
+          {type === 'transfer' && <Field label="Date"><DateInput value={date} max={today} onChange={setDate} /></Field>}
           <Field label="Note"><input value={note} placeholder={type === 'income' ? 'e.g. Freelance gig' : 'What was it?'} onChange={(e) => setNote(e.target.value)} /></Field>
           {from && type === 'expense' && from.kind === 'credit' && <p className="help"><Icon name="card" size={13} /> Charged to a card — your cash stays put until the card's due date.</p>}
         </>

@@ -17,7 +17,7 @@ export function useWidth<T extends HTMLElement>() {
   return [ref, w] as const;
 }
 
-const compact = (n: number, cur = 'USD') => new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, notation: 'compact', maximumFractionDigits: 1 }).format(n);
+const compact = (n: number, cur = 'USD') => new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, currencyDisplay: 'narrowSymbol', notation: 'compact', maximumFractionDigits: 1 }).format(n);
 
 function niceTicks(min: number, max: number, count = 3): number[] {
   const span = max - min || 1;

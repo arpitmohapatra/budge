@@ -14,7 +14,7 @@ import Invest from './pages/Invest';
 import Onboarding from './pages/Onboarding';
 import Settings from './pages/Settings';
 import { Palette } from './ui/Palette';
-import { Confetti, ToastHost, WhoSwitch } from './ui/kit';
+import { Confetti, ErrorBoundary, ToastHost, WhoSwitch } from './ui/kit';
 import { navigate, usePath } from './ui/router';
 
 const NAV = [
@@ -28,7 +28,7 @@ const NAV = [
 ] as const;
 
 function Shell() {
-  const { state, scope, today, openModal, setPalette } = useApp();
+  const { state, scope, today, openModal, closeModal, setPalette } = useApp();
   const path = usePath();
 
   useEffect(() => {
@@ -86,7 +86,7 @@ function Shell() {
 
         <main id="view" tabIndex={-1}>
           <div className="topbar"><a className="brand" href="#/"><img className="brand-mark" src={`${import.meta.env.BASE_URL}favicon/android-chrome-192x192.png`} alt="" /><span>Budge</span></a><WhoSwitch variant="top" /></div>
-          {page}
+          <ErrorBoundary resetKey={path}>{page}</ErrorBoundary>
         </main>
       </div>
 
@@ -99,7 +99,7 @@ function Shell() {
         <button type="button" onClick={() => openModal('more')} style={moreActive ? { color: 'var(--ink)', fontWeight: 600 } : undefined}><Ellipsis />More</button>
       </nav>
 
-      <ModalHost />
+      <ErrorBoundary compact onError={closeModal}><ModalHost /></ErrorBoundary>
       <Palette />
       <ToastHost />
       <Confetti />

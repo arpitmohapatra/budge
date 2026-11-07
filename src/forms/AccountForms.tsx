@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Check, Trash2 } from 'lucide-react';
 import { ACCOUNT_KINDS, Icon } from '../ui/Icon';
-import { Field, MoneyInput, Sheet, Toggle, num } from '../ui/kit';
+import { DateInput, Field, MoneyInput, Sheet, Toggle, num } from '../ui/kit';
 import { deleteAccount, useApp } from '../lib/store';
 import { FAMILY, type Account, type AccountKind, type Due } from '../lib/types';
 import { round2, uid } from '../lib/ledger';
@@ -137,7 +137,7 @@ export function DueForm({ id, accountId }: { id?: string; accountId?: string }) 
       {card && <Field label="Label (optional)"><input value={name} placeholder={`${card.name} payment`} onChange={(e) => setName(e.target.value)} /></Field>}
       <div className="row keep">
         <MoneyInput label="Amount due" value={amount} onChange={setAmount} autoFocus />
-        <Field label="Due date"><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+        <Field label="Due date"><DateInput value={date} onChange={setDate} /></Field>
       </div>
       <Field label="Deduct from"><AccountSelect value={from} onChange={setFrom} accounts={banks} /></Field>
       {!card && (

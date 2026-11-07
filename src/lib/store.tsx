@@ -116,7 +116,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const money = useMemo(() => {
     const cur = state?.settings.currency ?? 'USD';
-    const mk = (d: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, minimumFractionDigits: d, maximumFractionDigits: d });
+    const mk = (d: number) => new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, currencyDisplay: 'narrowSymbol', minimumFractionDigits: d, maximumFractionDigits: d });
     const f2 = mk(2), f0 = mk(0);
     const wrap = (f: Intl.NumberFormat) => (n: number, o?: { sign?: boolean }) => {
       const s = f.format(Math.abs(n) < 0.005 ? 0 : n);

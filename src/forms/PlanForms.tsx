@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Check, Trash2 } from 'lucide-react';
 import { CatTile, Icon } from '../ui/Icon';
-import { Field, MoneyInput, Sheet, Toggle, num } from '../ui/kit';
+import { DateInput, Field, MoneyInput, Sheet, Toggle, num } from '../ui/kit';
 import { useApp } from '../lib/store';
 import { addDaysYMD, FREQUENCIES, fmtDate, occurrencesBetween, monthOf, ordinal } from '../lib/dates';
 import { primaryAccount, spendByCategory, uid } from '../lib/ledger';
@@ -77,7 +77,7 @@ export function RecurringForm({ id, kind: presetKind }: { id?: string; kind?: 'i
           <Field label="Second pay day of month"><input inputMode="numeric" value={d2} onChange={(e) => setD2(e.target.value.replace(/\D/g, '').slice(0, 2))} /></Field>
         </div>
       ) : (
-        <Field label={isIncome ? 'Next pay date' : 'Next date'}><input type="date" value={anchor} onChange={(e) => setAnchor(e.target.value)} /></Field>
+        <Field label={isIncome ? 'Next pay date' : 'Next date'}><DateInput value={anchor} onChange={setAnchor} /></Field>
       )}
       <Toggle checked={rollBack} onChange={setRollBack} label="Weekend or holiday? Pay the day before" sub="Moves to the last business day before the weekend/holiday (US federal holidays)" />
       <div className="field">
@@ -101,7 +101,7 @@ export function RecurringForm({ id, kind: presetKind }: { id?: string; kind?: 'i
       </div>
       {ex && (
         <>
-          <Field label="Ends on (optional)"><input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></Field>
+          <Field label="Ends on (optional)"><DateInput value={end} allowEmpty onChange={setEnd} /></Field>
           <Toggle checked={active} onChange={setActive} label="Active" sub="Pause to stop posting and exclude it from the forecast" />
         </>
       )}

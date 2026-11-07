@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { useApp } from '../lib/store';
+import { parseYMD, toYMD } from '../lib/dates';
 import type { Profile } from '../lib/types';
 import { FAMILY } from '../lib/types';
 
@@ -85,15 +86,23 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
   );
 }
 
+export function currencySymbol(currency: string): string {
+  try {
+    const part = new Intl.NumberFormat(undefined, { style: 'currency', currency, currencyDisplay: 'narrowSymbol' }).formatToParts(0).find((p) => p.type === 'currency');
+    return part?.value ?? currency;
+  } catch { return currency; }
+}
+const prefixPad = (sym: string) => `calc(${Math.max(1, sym.length) * 0.62}em + 22px)`;
+
 export function MoneyInput({ value, onChange, autoFocus, placeholder = '0.00', label, hint, allowNegative }: { value: string; onChange: (v: string) => void; autoFocus?: boolean; placeholder?: string; label?: string; hint?: string; allowNegative?: boolean }) {
   const { state } = useApp();
-  const sym = (0).toLocaleString(undefined, { style: 'currency', currency: state.settings.currency, minimumFractionDigits: 0 }).replace(/[\d\s.,]/g, '');
+  const sym = currencySymbol(state.settings.currency);
   return (
     <div className="field">
       {label && <label>{label}</label>}
       <div className="money-input">
         <span>{sym}</span>
-        <input inputMode="decimal" data-af={autoFocus ? '1' : undefined} placeholder={placeholder} value={value} onChange={(e) => onChange(clean(e.target.value, allowNegative))} />
+        <input style={{ paddingLeft: prefixPad(sym) }} inputMode="decimal" data-af={autoFocus ? '1' : undefined} placeholder={placeholder} value={value} onChange={(e) => onChange(clean(e.target.value, allowNegative))} />
       </div>
       {hint && <span className="hint">{hint}</span>}
     </div>
@@ -102,7 +111,7 @@ export function MoneyInput({ value, onChange, autoFocus, placeholder = '0.00', l
 
 export function BigAmount({ value, onChange, autoFocus }: { value: string; onChange: (v: string) => void; autoFocus?: boolean }) {
   const { state } = useApp();
-  const sym = (0).toLocaleString(undefined, { style: 'currency', currency: state.settings.currency, minimumFractionDigits: 0 }).replace(/[\d\s.,]/g, '');
+  const sym = currencySymbol(state.settings.currency);
   return (
     <div className="big-amount">
       <span>{sym}</span>
@@ -217,4 +226,50 @@ export function Confetti() {
       })}
     </div>
   );
+}
+
+/* ───────── Dates ───────── */
+const isYMD = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && toYMD(parseYMD(v)) === v;
+
+/**
+ * Safari-safe date field. Safari (and iOS) emit '' or half-typed years while the picker/segments are being edited;
+ * only well-formed dates inside [min, max] are passed up, so the rest of the app never sees a bad date.
+ */
+export function DateInput({ value, onChange, min = '2000-01-01', max = '2100-12-31', allowEmpty }: { value: string; onChange: (v: string) => void; min?: string; max?: string; allowEmpty?: boolean }) {
+  const [raw, setRaw] = useState(value);
+  useEffect(() => setRaw(value), [value]);
+  return (
+    <input
+      type="date" value={raw} min={min} max={max}
+      onChange={(e) => {
+        const v = e.target.value;
+        setRaw(v);
+        if (v === '') { if (allowEmpty) onChange(''); }
+        else if (isYMD(v) && v >= min && v <= max) onChange(v);
+      }}
+      onBlur={() => { if (raw !== value && !(raw === '' && allowEmpty)) setRaw(value); }}
+    />
+  );
+}
+
+/* ───────── Error boundary: a bad render never blanks the whole app ───────── */
+export class ErrorBoundary extends Component<{ children: ReactNode; resetKey?: string; onError?: () => void; compact?: boolean }, { err?: Error }> {
+  state: { err?: Error } = {};
+  static getDerivedStateFromError(err: Error) { return { err }; }
+  componentDidCatch(err: Error, info: ErrorInfo) { console.error(err, info.componentStack); this.props.onError?.(); }
+  componentDidUpdate(prev: { resetKey?: string }) { if (prev.resetKey !== this.props.resetKey && this.state.err) this.setState({ err: undefined }); }
+  render() {
+    if (!this.state.err) return this.props.children;
+    if (this.props.compact) return null;
+    return (
+      <div className="empty" role="alert">
+        <h2>That page hit a snag</h2>
+        <p>Your data is safe. Try again, or head back home.</p>
+        <div className="actions">
+          <button className="btn primary" onClick={() => this.setState({ err: undefined })}>Try again</button>
+          <button className="btn" onClick={() => { location.hash = '/'; this.setState({ err: undefined }); }}>Go home</button>
+        </div>
+      </div>
+    );
+  }
 }

@@ -6,7 +6,7 @@ import { useForecast } from '../lib/hooks';
 import { uid } from '../lib/ledger';
 import { useApp } from '../lib/store';
 import { ForecastChart } from '../ui/charts';
-import { CountUp, Field, MoneyInput, Seg, num } from '../ui/kit';
+import { CountUp, DateInput, Field, MoneyInput, Seg, num } from '../ui/kit';
 import { navigate } from '../ui/router';
 
 const VERDICT: Record<Verdict, { icon: React.ReactNode; title: string }> = {
@@ -72,7 +72,7 @@ export default function Forecast() {
           <div className="card-head"><div><h3>Can I afford it?</h3><span className="sub">Try a future expense against the forecast</span></div><Wand2 size={20} className="muted" /></div>
           <div className="row">
             <Field label="What is it?"><input value={name} placeholder="e.g. New laptop, flights" onChange={(e) => setName(e.target.value)} /></Field>
-            <Field label="When would you pay?"><input type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)} /></Field>
+            <Field label="When would you pay?"><DateInput value={date} min={today} onChange={setDate} /></Field>
           </div>
           <MoneyInput label="Cost" value={amount} onChange={setAmount} placeholder="0" />
           {a ? (

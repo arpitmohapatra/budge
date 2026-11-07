@@ -67,7 +67,7 @@ export default function Activity() {
         <label className="search"><Search /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search all activity" aria-label="Search" /></label>
       </div>
 
-      <div className="stats reveal" style={{ ['--d' as string]: '.08s', gridTemplateColumns: 'repeat(3, minmax(0,1fr))' }}>
+      <div className="stats three reveal" style={{ ['--d' as string]: '.08s' }}>
         <div className="stat"><span className="eyebrow">Income</span><span className="v num pos"><CountUp value={totals.income} format={fmt0} /></span></div>
         <div className="stat"><span className="eyebrow">Spent</span><span className="v num"><CountUp value={totals.spent} format={fmt0} /></span></div>
         <div className="stat"><span className="eyebrow">{totals.saved >= 0 ? 'Saved' : 'Overspent'}</span><span className={`v num ${totals.saved >= 0 ? 'pos' : 'neg'}`}><CountUp value={Math.abs(totals.saved)} format={fmt0} /></span>

@@ -80,8 +80,8 @@ export default function Bills() {
         <section className="card flush reveal"><div className="list">
           {groups.map(([date, evs]) => (
             <div key={date}>
-              <div className="li-group"><span>{relativeDay(date, today)} · {fmtDate(date, 'MMM d')}</span><span className="num">{fmt(evs.reduce((s, e) => s + e.amount, 0), { sign: true })}</span></div>
-              {evs.map((e, i) => <UpcomingRow key={i} e={e} showOwner={multi} />)}
+              <div className="li-group"><span>{(() => { const rd = relativeDay(date, today); return rd.includes(fmtDate(date, 'MMM d')) ? rd : `${rd} · ${fmtDate(date, 'MMM d')}`; })()}</span><span className="num">{fmt(evs.reduce((s, e) => s + e.amount, 0), { sign: true })}</span></div>
+              {evs.map((e, i) => <UpcomingRow key={i} e={e} showOwner={multi} grouped />)}
             </div>
           ))}
         </div></section>

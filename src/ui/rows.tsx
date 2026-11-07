@@ -43,7 +43,7 @@ export function TxRow({ t, showDate, showOwner }: { t: Transaction; showDate?: b
   );
 }
 
-export function UpcomingRow({ e, showOwner }: { e: ForecastEvent; showOwner?: boolean }) {
+export function UpcomingRow({ e, showOwner, grouped }: { e: ForecastEvent; showOwner?: boolean; grouped?: boolean }) {
   const { state, today, fmt, openModal } = useApp();
   const acct = state.accounts.find((a) => a.id === e.accountId);
   const income = e.amount > 0;
@@ -58,7 +58,7 @@ export function UpcomingRow({ e, showOwner }: { e: ForecastEvent; showOwner?: bo
       <span className="tile" style={{ ['--c' as string]: color }}><Icon name={icon} /></span>
       <span className="body">
         <span className="t">{e.label}</span>
-        <span className="s">{showOwner && <Owner id={e.profileId} />}{(() => { const rd = relativeDay(e.date, today); return rd.includes(fmtDate(e.date, 'MMM d')) ? rd : `${rd} · ${fmtDate(e.date, 'MMM d')}`; })()}{acct ? ` · ${acct.name}` : ''}</span>
+        <span className="s">{showOwner && <Owner id={e.profileId} />}{!grouped && <>{(() => { const rd = relativeDay(e.date, today); return rd.includes(fmtDate(e.date, 'MMM d')) ? rd : `${rd} · ${fmtDate(e.date, 'MMM d')}`; })()}{acct ? ' · ' : ''}</>}{acct ? acct.name : ''}</span>
       </span>
       <span className={`amt num ${income ? 'pos' : ''}`}>{income ? '+' : '−'}{fmt(Math.abs(e.amount))}</span>
     </button>
@@ -72,16 +72,16 @@ export function BudgetLine({ r, frac, onClick }: { r: BudgetRow; frac?: number; 
   return (
     <button type="button" className="li bl" onClick={onClick} disabled={!onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
       <CatTile cat={cat} />
-      <span className="body" style={{ gap: 7 }}>
-        <span style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+      <span className="body" style={{ gap: 6 }}>
+        <span className="bl-top">
           <span className="t">{cat?.name}</span>
-          <span className="num" style={{ fontSize: 13, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{fmt0(r.spent)} <span style={{ opacity: .7 }}>of {fmt0(r.limit)}</span></span>
+          <span className="bl-amt num">{fmt0(r.spent)} <span style={{ opacity: .7 }}>of {fmt0(r.limit)}</span></span>
         </span>
         <span className="bar" style={{ ['--p' as string]: Math.min(100, r.pct * 100), ['--c' as string]: color, ['--m' as string]: frac !== undefined ? frac * 100 : 0 } as React.CSSProperties}>
           <i />{frac !== undefined && frac > 0 && frac < 1 && <b />}
         </span>
       </span>
-      <span style={{ minWidth: 82, textAlign: 'right' }}>
+      <span className="bl-pill">
         {r.state === 'over' ? <span className="pill bad">Over {fmt0(r.spent - r.limit)}</span>
           : r.state === 'watch' ? <span className="pill warn">{fmt0(r.remaining)} left</span>
           : <span className="pill good">{fmt0(r.remaining)} left</span>}
