@@ -119,7 +119,8 @@ export function materialize(state: AppState, today: YMD): MaterializeResult {
     const dates = recOccurrences(r, from, today);
     for (const date of dates) {
       created.push({
-        id: uid(), profileId: r.profileId, type: r.kind, amount: r.amount, date, accountId: r.accountId,
+        // Deterministic id: two phones posting the same scheduled item produce the SAME transaction, so sync merges them.
+        id: `rec:${r.id}:${date}`, profileId: r.profileId, type: r.kind, amount: r.amount, date, accountId: r.accountId,
         categoryId: r.categoryId ?? (r.kind === 'income' ? 'paycheck' : 'other'), note: r.name, recurringId: r.id, createdAt: Date.now(),
       });
     }
@@ -129,7 +130,7 @@ export function materialize(state: AppState, today: YMD): MaterializeResult {
 
   const dues = state.dues.map((d): Due => {
     if (d.status !== 'open' || d.date > today) return d;
-    const id = uid();
+    const id = `due:${d.id}`;
     created.push(
       d.accountId
         ? { id, profileId: d.profileId, type: 'transfer', amount: d.amount, date: d.date, accountId: d.payFromId, toAccountId: d.accountId, note: d.name, dueId: d.id, createdAt: Date.now() }

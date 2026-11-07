@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ConnectForm } from '../sync/SyncUI';
 import { ArrowRight, FlaskConical } from 'lucide-react';
 import { demoState, emptyState } from '../lib/demo';
 import { PROFILE_COLORS } from '../lib/ledger';
@@ -10,6 +11,7 @@ export default function Onboarding() {
   const [a, setA] = useState('');
   const [b, setB] = useState('');
   const [cur, setCur] = useState('USD');
+  const [connect, setConnect] = useState(false);
   const names: [string, string] = [a.trim() || 'Me', b.trim() || 'Wife'];
   const start = (demo: boolean) => {
     const base = demo ? demoState(today, names) : emptyState();
@@ -32,7 +34,11 @@ export default function Onboarding() {
           <button className="btn primary" onClick={() => start(false)}>Start fresh <ArrowRight /></button>
           <button className="btn" onClick={() => start(true)}><FlaskConical /> Explore with sample data</button>
         </div>
-        <p className="help">Everything is stored on this device only. You can erase the sample data in Settings any time.</p>
+        <p className="help">Everything is stored on this device. You can erase the sample data in Settings any time.</p>
+        <div className="ob-connect">
+          <button type="button" className="link-btn" onClick={() => setConnect(!connect)}>{connect ? 'Hide' : 'Already use Budge on another phone? Connect to sync'}</button>
+          {connect && <><p className="help">Enter the hub details from your other phone. Your data will download and replace this setup.</p><ConnectForm /></>}
+        </div>
       </div>
     </div>
   );

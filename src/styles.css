@@ -475,3 +475,10 @@ button.legend-row:hover { background: var(--surface-2); } .legend-row[aria-press
   .stats.three .stat .eyebrow { font-size: 10px; }
   .legend { gap: 10px; }
 }
+
+/* Sync */
+.sync-chip { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 12px; font-weight: 500; color: var(--muted); }
+.sync-chip.syncing svg { animation: spin 1s linear infinite; }
+.sync-chip.error { color: var(--neg-text); border-color: var(--neg); } .sync-chip.offline { color: var(--warn-text); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.ob-connect { border-top: 1px solid var(--line-2); padding-top: 16px; display: flex; flex-direction: column; gap: 12px; }

@@ -14,6 +14,8 @@ import Invest from './pages/Invest';
 import Onboarding from './pages/Onboarding';
 import Settings from './pages/Settings';
 import { Palette } from './ui/Palette';
+import { SyncBridge } from './sync/SyncBridge';
+import { SyncChip } from './sync/SyncUI';
 import { Confetti, ErrorBoundary, ToastHost, WhoSwitch } from './ui/kit';
 import { navigate, usePath } from './ui/router';
 
@@ -80,7 +82,8 @@ function Shell() {
           </div>
           <div className="sidebar-foot">
             <button type="button" className="nav-btn" onClick={() => navigate('/settings')}><Cog /> Settings & backup</button>
-            <p className="local-note">Everything lives on this device. Back up from Settings.</p>
+            <SyncChip />
+            <p className="local-note">Data lives on this device (encrypted copy syncs if you connect a hub). Back up from Settings.</p>
           </div>
         </nav>
 
@@ -109,5 +112,6 @@ function Shell() {
 }
 
 export default function App() {
-  return <AppProvider><Shell /></AppProvider>;
+  // SyncBridge sits above Shell so a brand-new phone (still on the welcome screen) can receive its data.
+  return <AppProvider><SyncBridge /><Shell /></AppProvider>;
 }

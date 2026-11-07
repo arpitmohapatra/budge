@@ -5,6 +5,8 @@ import { demoState, emptyState } from '../lib/demo';
 import { PROFILE_COLORS } from '../lib/ledger';
 import { useApp } from '../lib/store';
 import { Avatar, Field, MoneyInput, Seg, Toggle, num } from '../ui/kit';
+import { SyncCard } from '../sync/SyncUI';
+import { useHubState } from '../sync/hub';
 
 const CURRENCIES = ['USD', 'CAD', 'EUR', 'GBP', 'INR', 'AUD', 'JPY'];
 
@@ -12,6 +14,7 @@ export default function Settings() {
   const { state, today, update, replaceAll, toast, fmt0 } = useApp();
   const s = state.settings;
   const file = useRef<HTMLInputElement>(null);
+  const hs = useHubState();
   const set = (patch: Partial<typeof s>) => update((st) => ({ ...st, settings: { ...st.settings, ...patch } }));
 
   const onFile = async (f?: File) => {
@@ -70,9 +73,11 @@ export default function Settings() {
         </div>
       </section>
 
+      <SyncCard />
+
       <section className="card reveal">
         <div className="card-head"><h3>Backup & sharing</h3></div>
-        <p className="help">Budge keeps everything on this device. To use it on two phones, have each person export their own data, then import it on the other phone — it only replaces that person's numbers. (Both phones need the same starting backup so the profiles match: export a full backup once, import it on the second phone.)</p>
+        <p className="help">Without sync, Budge keeps everything on this device. These files are for manual backups or moving data around: a full backup, or just one person’s numbers (importing replaces only that person’s data).</p>
         <div className="actions">
           <button className="btn" onClick={() => download(`budge-backup-${today}.json`, exportAll(state))}><Download /> Full backup</button>
           {state.profiles.map((p) => <button key={p.id} className="btn" onClick={() => download(`budge-${p.name.toLowerCase().replace(/\W+/g, '-')}-${today}.json`, exportProfile(state, p.id))}><Download /> {p.name}'s data</button>)}
@@ -84,8 +89,8 @@ export default function Settings() {
       <section className="card reveal">
         <div className="card-head"><h3>Data</h3></div>
         <div className="actions">
-          <button className="btn" onClick={() => { if (confirm('Replace your data with a sample household? (Your current data will be lost — export a backup first.)')) { replaceAll(demoState(today, [state.profiles[0].name, state.profiles[1]?.name ?? 'Wife'])); toast('Sample data loaded'); } }}><FlaskConical /> Load sample data</button>
-          <button className="btn danger" onClick={() => { if (confirm('Erase everything in Budge on this device? This cannot be undone.')) { const e = emptyState(); replaceAll({ ...e, onboarded: true, profiles: state.profiles, settings: state.settings }); toast('All data erased'); } }}><Trash2 /> Erase all data</button>
+          <button className="btn" onClick={() => { if (confirm(hs.configured ? 'Replace your data with a sample household? Sync is on, so your other phone will get it too. Export a backup first.' : 'Replace your data with a sample household? (Your current data will be lost — export a backup first.)')) { replaceAll(demoState(today, [state.profiles[0].name, state.profiles[1]?.name ?? 'Wife'])); toast('Sample data loaded'); } }}><FlaskConical /> Load sample data</button>
+          <button className="btn danger" onClick={() => { if (confirm(hs.configured ? 'Erase everything? Sync is on, so this ALSO erases the copy on your other phone and the hub. This cannot be undone.' : 'Erase everything in Budge on this device? This cannot be undone.')) { const e = emptyState(); replaceAll({ ...e, onboarded: true, profiles: state.profiles, settings: state.settings }); toast('All data erased'); } }}><Trash2 /> Erase all data</button>
         </div>
         <p className="help">Buffer {fmt0(s.buffer)} · {state.accounts.length} accounts · {state.transactions.length} transactions</p>
       </section>
