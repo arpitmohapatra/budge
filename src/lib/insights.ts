@@ -32,6 +32,14 @@ export function buildInsights(state: AppState, scope: string[], today: YMD, fmt:
     out.push({ id: 'ok', tone: 'good', icon: 'sun', title: 'Smooth sailing for 60 days', body: `You never drop below ${fmt(f.low.balance)}, and end the period at ${fmt(f.end)}.`, route: '/forecast' });
   }
 
+  // 1b. Bank minimum-balance fees
+  const fr = f.feeRisks[0];
+  if (fr) {
+    out.push(fr.below
+      ? { id: `fee-${fr.accountId}`, tone: 'bad', icon: 'landmark', title: `${fr.name} is under its ${fmt(fr.min)} minimum`, body: `Add ${fmt(fr.min - fr.now)} to avoid ${fr.fee ? `the ${fmt(fr.fee)} fee` : 'a fee'}${fr.low < fr.now ? ` — it drops to ${fmt(fr.low)} by ${fmtDate(fr.lowDate)}` : ''}.`, route: '/accounts' }
+      : { id: `fee-${fr.accountId}`, tone: 'warn', icon: 'landmark', title: `${fr.name} will dip under its ${fmt(fr.min)} minimum`, body: `Projected ${fmt(fr.low)} on ${fmtDate(fr.lowDate)}${fr.fee ? ` — a ${fmt(fr.fee)} fee` : ''}. Move ${fmt(fr.shortBy)} in beforehand.`, route: '/forecast' });
+  }
+
   // 2. Budgets
   const cur = monthOf(today);
   const rows = budgetRows(state, scope, cur, today);

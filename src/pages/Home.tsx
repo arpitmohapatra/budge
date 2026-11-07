@@ -102,12 +102,15 @@ export default function Home() {
           <div className={`hero-num num${sts.safe < 0 ? ' bad' : ''}`}><CountUp value={sts.safe} format={fmt0} /></div>
           <p className="hero-sub">
             {sts.safe < 0
-              ? <>Bills due before {fmtDate(sts.untilDate, 'EEE, MMM d')} exceed your cash by <b>{fmt0(-sts.safe)}</b>.</>
+              ? (sts.liquid - sts.commitments >= 0
+                ? <>You're <b>{fmt0(-sts.safe)}</b> short of your bank minimums — top up to avoid fees.</>
+                : <>Bills due before {fmtDate(sts.untilDate, 'EEE, MMM d')} exceed your cash by <b>{fmt0(-sts.safe)}</b>.</>)
               : <>{sts.payday ? 'Until ' : 'Through '}<b>{fmtDate(sts.untilDate, 'EEE, MMM d')}</b> · {sts.days} day{sts.days === 1 ? '' : 's'} · about <b>{fmt0(sts.perDay)}/day</b></>}
           </p>
           <div className="hero-chips">
             <span className="hchip">Cash {fmt0(sts.liquid)}</span>
             <span className="hchip">Bills before then {fmt0(sts.commitments)}</span>
+            {sts.reserved > 0 && <span className="hchip">Kept for bank minimums {fmt0(sts.reserved)}</span>}
           </div>
           {status && <p className={`hero-status ${status.good ? 'good' : 'bad'}`}>{status.text}</p>}
           <div className="hero-actions">

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { BellRing, CheckCircle2, Info, OctagonX, Plus, ShoppingBag, Trash2, TriangleAlert, Wand2 } from 'lucide-react';
 import { addDaysYMD, fmtDate, relativeDay } from '../lib/dates';
-import { checkAffordability, forecast, horizonFor, type Verdict } from '../lib/forecast';
+import { checkAffordability, forecast, horizonFor, liquidAccounts, type Verdict } from '../lib/forecast';
+import { AccountSelect } from '../forms/TxForm';
 import { useForecast } from '../lib/hooks';
 import { uid } from '../lib/ledger';
 import { useApp } from '../lib/store';
@@ -19,19 +20,23 @@ export default function Forecast() {
   const { state, scope, today, view, bal, fmt0, update, toast } = useApp();
   const buffer = state.settings.buffer;
   const [horizon, setHorizon] = useState(90);
+  const [payFrom, setPayFrom] = useState('');
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(addDaysYMD(today, 7));
   const amt = num(amount);
   const len = Math.max(horizon, amt > 0 ? horizonFor(date, today, horizon) : horizon);
   const fc = useForecast(len);
-  const a = amt > 0 ? checkAffordability(fc, amt, date < today ? today : date, buffer) : null;
+  const payAccts = useMemo(() => liquidAccounts(state, scope), [state, scope]);
+  const payAcct = payAccts.find((x) => x.id === payFrom) ?? payAccts.find((x) => x.primary) ?? payAccts[0];
+  const payOpt = payAcct ? { payFrom: { id: payAcct.id, name: payAcct.name, minBalance: payAcct.minBalance, minFee: payAcct.minFee } } : {};
+  const a = amt > 0 ? checkAffordability(fc, amt, date < today ? today : date, buffer, payOpt) : null;
   const planned = state.planned.filter((p) => p.scope === view);
 
   const rowsFor = useMemo(() => planned.map((p) => {
     const f = forecast(state, scope, horizonFor(p.date, today), today, bal);
-    return { p, a: checkAffordability(f, p.amount, p.date < today ? today : p.date, buffer) };
-  }), [planned, state, scope, today, bal, buffer]);
+    return { p, a: checkAffordability(f, p.amount, p.date < today ? today : p.date, buffer, payOpt) };
+  }), [planned, state, scope, today, bal, buffer, payAcct?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const incomeCount = fc.events.filter((e) => e.kind === 'income').length;
   const noIncome = incomeCount === 0;
@@ -49,6 +54,10 @@ export default function Forecast() {
       {noIncome && <div className="callout warn reveal"><BellRing /><span>No paydays scheduled for this view, so the forecast only shows money going out. <button className="link-btn" onClick={() => navigate('/bills')}>Add income →</button></span></div>}
       {fc.accountLows.slice(0, 2).map((l) => (
         <div key={l.accountId} className="callout bad reveal"><OctagonX /><span><b>{l.name}</b> would dip to <b>{fmt0(l.balance)}</b> on {fmtDate(l.date, 'EEE, MMM d')}. Move money in beforehand or change which account a due comes from.</span></div>
+      ))}
+
+      {fc.feeRisks.slice(0, 2).map((r) => (
+        <div key={r.accountId} className="callout warn reveal"><TriangleAlert /><span><b>{r.name}</b> {r.below ? 'is under' : 'is projected to dip under'} its {fmt0(r.min)} minimum{r.fee ? ` (${fmt0(r.fee)} fee)` : ''}{r.below ? ` right now (${fmt0(r.now)})` : ` on ${fmtDate(r.firstBelow, 'EEE, MMM d')}`}{r.low < r.now ? <>, lowest <b>{fmt0(r.low)}</b> on {fmtDate(r.lowDate, 'MMM d')}</> : null}. Keep {fmt0(r.shortBy)} more in it to avoid the fee.</span></div>
       ))}
 
       <div className="stats reveal" style={{ ['--d' as string]: '.05s' }}>
@@ -74,7 +83,10 @@ export default function Forecast() {
             <Field label="What is it?"><input value={name} placeholder="e.g. New laptop, flights" onChange={(e) => setName(e.target.value)} /></Field>
             <Field label="When would you pay?"><DateInput value={date} min={today} onChange={setDate} /></Field>
           </div>
-          <MoneyInput label="Cost" value={amount} onChange={setAmount} placeholder="0" />
+          <div className="row">
+            <MoneyInput label="Cost" value={amount} onChange={setAmount} placeholder="0" />
+            {payAccts.length > 0 && <Field label="Pay from" hint={payAcct?.minBalance ? `Bank minimum ${fmt0(payAcct.minBalance)} is respected` : undefined}><AccountSelect value={payAcct?.id ?? ''} onChange={setPayFrom} accounts={payAccts} /></Field>}
+          </div>
           {a ? (
             <div className={`verdict ${a.verdict}`} aria-live="polite">
               <div className="v-head">{VERDICT[a.verdict].icon}<b>{VERDICT[a.verdict].title}</b></div>
@@ -82,6 +94,7 @@ export default function Forecast() {
                 <li>Lowest your cash gets after buying: <b className="num">{fmt0(a.lowAfter)}</b> on {fmtDate(a.lowDate, 'EEE, MMM d')}.</li>
                 <li>{a.slack >= 0 ? <>You'd still hold <b>{fmt0(a.slack)}</b> above your {fmt0(buffer)} cushion.</> : a.lowAfter >= 0 ? <>That's <b>{fmt0(-a.slack)}</b> into your {fmt0(buffer)} cushion.</> : <>That's <b>{fmt0(-a.lowAfter)}</b> below zero.</>}</li>
                 {a.verdict !== 'yes' && <li>{a.earliest ? <>Earliest comfortable date: <b>{fmtDate(a.earliest, 'EEE, MMM d')}</b> ({relativeDay(a.earliest, today).toLowerCase()}).</> : <>No comfortable date in the next {len} days at your current pace.</>}</li>}
+                {a.feeRisk && <li><b>Fee risk:</b> paying from {a.feeRisk.name} would take it to <b className="num">{fmt0(a.feeRisk.lowAfter)}</b> on {fmtDate(a.feeRisk.lowDate, 'EEE, MMM d')} — under its {fmt0(a.feeRisk.min)} minimum{a.feeRisk.fee ? `, a ${fmt0(a.feeRisk.fee)} fee` : ''}. Pay from another account or move money in first.</li>}
                 <li>On {fmtDate(date, 'MMM d')} you could spend up to <b>{fmt0(a.maxAmount)}</b> and keep your cushion.</li>
               </ul>
               <div className="actions">
@@ -116,6 +129,7 @@ export default function Forecast() {
           <li><b>Adds</b> every scheduled paycheck, using each pay date (weekend/holiday paydays move to the day before).</li>
           <li><b>Subtracts</b> recurring bills and card dues on their dates from the account they come out of.</li>
           <li><b>Subtracts</b> your typical everyday spending — {fmt0(fc.avgDaily)}/day, averaged over the last {state.settings.windowDays} days (bills and card payments excluded).</li>
+          <li><b>Bank minimums:</b> if an account has a minimum balance (to dodge a fee), the forecast flags when it would dip under, and “Can I afford it?” checks the account you pay from.</li>
           <li><b>Cushion:</b> {fmt0(buffer)} is treated as untouchable — verdicts of “tight” mean you'd dip into it.</li>
         </ul>
       </section>

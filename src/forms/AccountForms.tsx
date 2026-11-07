@@ -18,6 +18,8 @@ export function AccountForm({ id, profileId, kind: presetKind }: { id?: string; 
   const [neg, setNeg] = useState(ex ? (bal[ex.id] ?? 0) < 0 && ex.kind !== 'credit' : false);
   const [limit, setLimit] = useState(ex?.limit ? String(ex.limit) : '');
   const [last4, setLast4] = useState(ex?.last4 ?? '');
+  const [minBal, setMinBal] = useState(ex?.minBalance ? String(ex.minBalance) : '');
+  const [minFee, setMinFee] = useState(ex?.minFee ? String(ex.minFee) : '');
   const [primary, setPrimary] = useState(ex?.primary ?? !state.accounts.some((a) => a.profileId === owner && a.primary));
   const isCard = kind === 'credit';
   const placeholder = { checking: 'e.g. Chase Checking', savings: 'e.g. Ally Savings', credit: 'e.g. Sapphire Visa', cash: 'Wallet' }[kind];
@@ -32,7 +34,7 @@ export function AccountForm({ id, profileId, kind: presetKind }: { id?: string; 
       const diff = round2(want - cur);
       update((s) => ({
         ...s,
-        accounts: s.accounts.map((a) => (a.id === ex.id ? { ...a, name: name.trim(), kind, limit: isCard ? num(limit) || undefined : undefined, last4: last4 || undefined, primary: !isCard && kind !== 'savings' ? primary : false } : (primary && !isCard && a.profileId === ex.profileId && a.primary ? { ...a, primary: false } : a))),
+        accounts: s.accounts.map((a) => (a.id === ex.id ? { ...a, name: name.trim(), kind, limit: isCard ? num(limit) || undefined : undefined, last4: last4 || undefined, minBalance: !isCard && num(minBal) > 0 ? num(minBal) : undefined, minFee: !isCard && num(minBal) > 0 && num(minFee) > 0 ? num(minFee) : undefined, primary: !isCard && kind !== 'savings' ? primary : false } : (primary && !isCard && a.profileId === ex.profileId && a.primary ? { ...a, primary: false } : a))),
         transactions: Math.abs(diff) >= 0.01 ? [...s.transactions, { id: uid(), createdAt: Date.now(), profileId: ex.profileId, type: 'adjust', amount: diff, date: today, accountId: ex.id, note: 'Balance adjustment' }] : s.transactions,
       }), { toast: 'Account updated' });
     } else {
@@ -40,6 +42,7 @@ export function AccountForm({ id, profileId, kind: presetKind }: { id?: string; 
         id: uid(), profileId: owner, name: name.trim(), kind, startDate: today,
         startingBalance: isCard ? -entered : neg ? -entered : entered,
         limit: isCard ? num(limit) || undefined : undefined, last4: last4 || undefined,
+        minBalance: !isCard && num(minBal) > 0 ? num(minBal) : undefined, minFee: !isCard && num(minBal) > 0 && num(minFee) > 0 ? num(minFee) : undefined,
         primary: !isCard && kind !== 'savings' ? primary : false,
       };
       update((s) => ({ ...s, accounts: [...s.accounts.map((x) => (a.primary && x.profileId === owner && x.primary ? { ...x, primary: false } : x)), a] }), { toast: `${a.name} added` });
@@ -80,6 +83,15 @@ export function AccountForm({ id, profileId, kind: presetKind }: { id?: string; 
         hint={isCard ? 'The amount currently owed. Charges add to it; due payments bring it down.' : ex ? 'Changing this records an adjustment, so your history stays intact.' : 'What the account holds today. Everything you log from here moves it.'}
       />
       {!isCard && <Toggle checked={neg} onChange={setNeg} label="Balance is overdrawn" sub="Turn on if the account is currently negative" />}
+      {!isCard && kind !== 'cash' && (
+        <div className="stack">
+          <div className="row keep">
+            <MoneyInput label="Minimum balance (optional)" value={minBal} onChange={setMinBal} placeholder="e.g. 6000" />
+            <MoneyInput label="Fee if below" value={minFee} onChange={setMinFee} placeholder="e.g. 15" />
+          </div>
+          <span className="help">Many banks charge a monthly fee when the balance drops under a threshold (TD, for example). Set it and Budge warns you before you cross it, in the forecast and in “Can I afford it?”.</span>
+        </div>
+      )}
       {isCard && <MoneyInput label="Credit limit (optional)" value={limit} onChange={setLimit} hint="Lets us show how much of the limit you're using." />}
       {!isCard && kind !== 'savings' && <Toggle checked={primary} onChange={setPrimary} label="Main spending account" sub="Everyday spending and the forecast come out of this one" />}
       <div className="dlg-foot">

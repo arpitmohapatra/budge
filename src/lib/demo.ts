@@ -32,11 +32,11 @@ export function demoState(today: YMD, names: [string, string] = ['Me', 'Wife']):
   const acc = (id: string, profileId: string, name: string, kind: Account['kind'], extra: Partial<Account> = {}): Account =>
     ({ id, profileId, name, kind, startingBalance: 0, startDate, ...extra });
   const accounts: Account[] = [
-    acc('a1', P1, 'Chase Checking', 'checking', { primary: true, last4: '4821' }),
+    acc('a1', P1, 'Chase Checking', 'checking', { primary: true, last4: '4821', minBalance: 2500, minFee: 15 }),
     acc('a2', P1, 'Ally Savings', 'savings', { last4: '9034' }),
     acc('a3', P1, 'Sapphire Visa', 'credit', { limit: 8000, last4: '1188' }),
     acc('a4', P1, 'Wallet', 'cash'),
-    acc('b1', P2, 'BofA Checking', 'checking', { primary: true, last4: '7710' }),
+    acc('b1', P2, 'BofA Checking', 'checking', { primary: true, last4: '7710', minBalance: 3000, minFee: 12 }),
     acc('b2', P2, 'Marcus Savings', 'savings', { last4: '2265' }),
     acc('b3', P2, 'Amex Gold', 'credit', { limit: 6000, last4: '3009' }),
   ];

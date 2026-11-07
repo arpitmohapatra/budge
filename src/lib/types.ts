@@ -22,6 +22,10 @@ export interface Account {
   primary?: boolean;
   /** Credit limit (cards only). */
   limit?: number;
+  /** Bank charges a fee if the balance drops below this (checking/savings). */
+  minBalance?: number;
+  /** The fee itself, if known (informational — shown in warnings). */
+  minFee?: number;
   last4?: string;
   archived?: boolean;
 }

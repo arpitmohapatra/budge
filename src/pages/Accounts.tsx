@@ -32,6 +32,20 @@ function AccountCard({ a, i }: { a: Account; i: number }) {
         <div className="eyebrow">{isCard ? 'You owe' : 'Balance'}</div>
         <div className={`acct-bal num ${!isCard && b < 0 ? 'neg' : ''}`}><CountUp value={isCard ? owed : b} format={fmt} /></div>
       </div>
+      {!isCard && a.minBalance ? (() => {
+        const scale = Math.max(b, a.minBalance) * 1.2 || 1;
+        const under = b < a.minBalance;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="bar" style={{ ['--p' as string]: Math.max(0, b) / scale * 100, ['--c' as string]: under ? 'var(--neg)' : 'var(--pos)', ['--m' as string]: a.minBalance / scale * 100 } as React.CSSProperties}><i /><b /></div>
+            <span className={under ? 'neg' : 'muted'} style={{ fontSize: 12 }}>
+              {under
+                ? <>{fmt0(a.minBalance - b)} under the {fmt0(a.minBalance)} minimum{a.minFee ? ` — ${fmt0(a.minFee)} fee risk` : ' — fee risk'}</>
+                : <>{fmt0(b - a.minBalance)} above the {fmt0(a.minBalance)} minimum{a.minFee ? ` (avoids a ${fmt0(a.minFee)} fee)` : ''}</>}
+            </span>
+          </div>
+        );
+      })() : null}
       {isCard && a.limit ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div className="bar" style={{ ['--p' as string]: util * 100, ['--c' as string]: util > 0.5 ? 'var(--neg)' : util > 0.3 ? 'var(--warn)' : 'var(--pos)' } as React.CSSProperties}><i /></div>

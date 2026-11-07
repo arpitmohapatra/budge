@@ -177,3 +177,49 @@ describe('budgets', () => {
     expect(fam).toMatchObject({ limit: 200, spent: 215, state: 'over' });
   });
 });
+
+describe('bank minimum balance (fee threshold)', () => {
+  const withMin = (min: number) => {
+    const s = base({
+      recurring: [
+        { id: 'pay', profileId: 'me', kind: 'income', name: 'Paycheck', amount: 2000, frequency: 'semimonthly', days: [7, 22], rollBack: true, anchor: '2026-01-01', postedThrough: TODAY, accountId: 'chk', active: true },
+        { id: 'rent', profileId: 'me', kind: 'expense', name: 'Rent', amount: 1500, frequency: 'monthly', anchor: '2026-12-01', postedThrough: TODAY, accountId: 'chk', active: true },
+      ],
+    });
+    return { ...s, accounts: s.accounts.map((a) => (a.id === 'chk' ? { ...a, minBalance: min, minFee: 15 } : a)) };
+  };
+  it('flags an account that is under its minimum today and when it dips', () => {
+    const fc = forecast(withMin(1500), ['me'], 30, TODAY); // starts at 1000 < 1500
+    expect(fc.feeRisks).toHaveLength(1);
+    expect(fc.feeRisks[0]).toMatchObject({ accountId: 'chk', below: true, min: 1500, fee: 15, firstBelow: TODAY });
+    const ok = forecast(withMin(500), ['me'], 5, TODAY); // 1000 - 5*20 = 900 > 500 in a short window
+    expect(ok.feeRisks).toHaveLength(0);
+  });
+  it('predicts a future dip (rent) even though today is fine', () => {
+    const s = withMin(700);
+    const bigRent = { ...s, recurring: s.recurring.map((r) => (r.id === 'rent' ? { ...r, amount: 2600 } : r)) };
+    const fc = forecast(bigRent, ['me'], 40, TODAY); // payday Nov 20 lifts it, then Dec 1 rent drops it under 700
+    const r = fc.feeRisks[0];
+    expect(r.below).toBe(false);
+    expect(r.low).toBeLessThan(700);
+    expect(r.firstBelow > TODAY).toBe(true);
+  });
+  it('“can I afford it” respects the paying account’s minimum and moves the earliest date later', () => {
+    const s = withMin(900);
+    const fc = forecast(s, ['me'], 60, TODAY);
+    const pay = { id: 'chk', name: 'Checking', minBalance: 900, minFee: 15 };
+    const free = checkAffordability(fc, 80, TODAY, 0);                       // total cash is fine
+    const guarded = checkAffordability(fc, 80, TODAY, 0, { payFrom: pay }); // but 1000 - 80 - daily spend < 900
+    expect(free.verdict).toBe('yes');
+    expect(guarded.verdict).toBe('tight');
+    expect(guarded.feeRisk).toMatchObject({ accountId: 'chk', min: 900, fee: 15 });
+    expect(guarded.earliest && free.earliest && guarded.earliest >= free.earliest).toBe(true);
+    expect(checkAffordability(fc, 80, TODAY, 0, { payFrom: { id: 'wchk', name: 'No min' } }).feeRisk).toBeUndefined();
+  });
+  it('safe-to-spend holds the minimum back', () => {
+    const plain = safeToSpend(withMin(0), ['me'], TODAY);
+    const held = safeToSpend(withMin(600), ['me'], TODAY);
+    expect(held.reserved).toBe(600);
+    expect(held.safe).toBe(plain.safe - 600);
+  });
+});

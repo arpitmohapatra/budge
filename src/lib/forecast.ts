@@ -40,7 +40,29 @@ export interface Forecast {
   bills: number;
   spending: number;
   accountLows: AccountLow[];
+  /** Accounts projected to dip under their bank's minimum balance (fee risk). */
+  feeRisks: FeeRisk[];
+  /** Per-account projected balance by day (index 0 = today). */
+  acctSeries: Record<string, number[]>;
   hasPrimary: boolean;
+}
+
+export interface FeeRisk {
+  accountId: string;
+  name: string;
+  min: number;
+  fee?: number;
+  /** Balance today. */
+  now: number;
+  /** Lowest projected balance and when. */
+  low: number;
+  lowDate: YMD;
+  /** First day it is (or will be) under the minimum. */
+  firstBelow: YMD;
+  /** Already under the minimum today. */
+  below: boolean;
+  /** How far under at the lowest point. */
+  shortBy: number;
 }
 
 export function liquidAccounts(state: AppState, scope: string[]): Account[] {
@@ -101,6 +123,7 @@ export function forecast(state: AppState, scope: string[], horizon: number, toda
   const sum = () => { let s = 0; for (const v of running.values()) s += v; return round2(s); };
   const start = sum();
   const days: ForecastDay[] = [{ date: today, balance: start, events: [], spend: 0 }];
+  const acctSeries: Record<string, number[]> = Object.fromEntries(accts.map((a) => [a.id, [round2(bal[a.id] ?? 0)]]));
   let income = 0, bills = 0, spending = 0;
 
   for (let i = 1; i <= horizon; i++) {
@@ -117,6 +140,7 @@ export function forecast(state: AppState, scope: string[], horizon: number, toda
       if (v < l.balance) { l.balance = round2(v); l.date = date; }
     }
     days.push({ date, balance: sum(), events: evs, spend: avgTotal });
+    for (const [id, v] of running) acctSeries[id].push(round2(v));
   }
 
   const n = days.length;
@@ -129,11 +153,23 @@ export function forecast(state: AppState, scope: string[], horizon: number, toda
   }
   const lowIdx = suffixMinIdx[0];
 
+  const feeRisks: FeeRisk[] = [];
+  for (const a of accts) {
+    if (!a.minBalance || a.minBalance <= 0) continue;
+    const series = acctSeries[a.id];
+    let lowV = Infinity, lowI = 0, firstI = -1;
+    series.forEach((v, i) => { if (v < lowV) { lowV = v; lowI = i; } if (firstI < 0 && v < a.minBalance!) firstI = i; });
+    if (firstI < 0) continue;
+    feeRisks.push({ accountId: a.id, name: a.name, min: a.minBalance, fee: a.minFee, now: series[0], low: lowV, lowDate: days[lowI].date, firstBelow: days[firstI].date, below: series[0] < a.minBalance, shortBy: round2(a.minBalance - lowV) });
+  }
+  feeRisks.sort((x, y) => x.firstBelow.localeCompare(y.firstBelow));
+
   return {
     today, days, start, end: days[n - 1].balance, suffixMin, suffixMinIdx,
     low: { date: days[lowIdx].date, balance: days[lowIdx].balance, index: lowIdx },
     avgDaily: round2(avgTotal), events, income: round2(income), bills: round2(bills), spending: round2(spending),
     accountLows: [...lows.values()].filter((l) => l.balance < 0).sort((a, b) => a.balance - b.balance),
+    feeRisks, acctSeries,
     hasPrimary,
   };
 }
@@ -154,20 +190,49 @@ export interface Affordability {
   earliest?: YMD;
   /** Whether the purchase date is inside the forecast window. */
   inRange: boolean;
+  /** Set when paying from this account would push it under its bank minimum (fee risk). */
+  feeRisk?: { accountId: string; name: string; min: number; fee?: number; lowAfter: number; lowDate: YMD };
 }
 
-export function checkAffordability(fc: Forecast, amount: number, date: YMD, buffer: number): Affordability {
+export interface AffordOpts {
+  /** The account the purchase would come out of. Its bank minimum (if any) is respected. */
+  payFrom?: { id: string; name: string; minBalance?: number; minFee?: number };
+}
+
+export function checkAffordability(fc: Forecast, amount: number, date: YMD, buffer: number, opts: AffordOpts = {}): Affordability {
   const n = fc.days.length;
   const idx = Math.min(Math.max(diffDays(date, fc.today), 0), n - 1);
   const inRange = diffDays(date, fc.today) <= n - 1;
   const lowAfter = round2(fc.suffixMin[idx] - amount);
   const lowDate = fc.days[fc.suffixMinIdx[idx]].date;
-  const verdict: Verdict = lowAfter >= buffer ? 'yes' : lowAfter >= 0 ? 'tight' : 'no';
+  let verdict: Verdict = lowAfter >= buffer ? 'yes' : lowAfter >= 0 ? 'tight' : 'no';
+
+  // Respect the paying account's bank minimum: dipping under it costs a fee even if total cash is fine.
+  const series = opts.payFrom ? fc.acctSeries[opts.payFrom.id] : undefined;
+  const min = opts.payFrom?.minBalance && opts.payFrom.minBalance > 0 ? opts.payFrom.minBalance : 0;
+  let accSuffix: number[] | undefined;
+  let accIdx: number[] | undefined;
+  if (series && min) {
+    accSuffix = new Array<number>(series.length); accIdx = new Array<number>(series.length);
+    let m = Infinity, mi = series.length - 1;
+    for (let i = series.length - 1; i >= 0; i--) { if (series[i] <= m) { m = series[i]; mi = i; } accSuffix[i] = m; accIdx[i] = mi; }
+  }
+  let feeRisk: Affordability['feeRisk'];
+  if (accSuffix && accIdx && opts.payFrom) {
+    const accLow = round2(accSuffix[idx] - amount);
+    if (accLow < min) {
+      feeRisk = { accountId: opts.payFrom.id, name: opts.payFrom.name, min, fee: opts.payFrom.minFee, lowAfter: accLow, lowDate: fc.days[accIdx[idx]].date };
+      if (verdict === 'yes') verdict = 'tight';
+    }
+  }
+
   let earliest: YMD | undefined;
   for (let i = 0; i < n; i++) {
-    if (fc.suffixMin[i] - amount >= buffer) { earliest = fc.days[i].date; break; }
+    const totalOk = fc.suffixMin[i] - amount >= buffer;
+    const accOk = !accSuffix || accSuffix[i] - amount >= min;
+    if (totalOk && accOk) { earliest = fc.days[i].date; break; }
   }
-  return { verdict, lowAfter, lowDate, slack: round2(lowAfter - buffer), maxAmount: Math.max(0, round2(fc.suffixMin[idx] - buffer)), earliest, inRange };
+  return { verdict, lowAfter, lowDate, slack: round2(lowAfter - buffer), maxAmount: Math.max(0, round2(fc.suffixMin[idx] - buffer)), earliest, inRange, feeRisk };
 }
 
 /** Horizon big enough to cover a purchase date (min 90 days, max 365). */
@@ -186,6 +251,8 @@ export interface SafeToSpend {
   /** True when the date is a real upcoming paycheck (otherwise month-end). */
   payday: boolean;
   avgDaily: number;
+  /** Money held back to stay above bank minimum balances. */
+  reserved: number;
 }
 
 export function safeToSpend(state: AppState, scope: string[], today: YMD, bal = balances(state, today)): SafeToSpend {
@@ -207,6 +274,7 @@ export function safeToSpend(state: AppState, scope: string[], today: YMD, bal = 
   for (const e of fc.events) if (e.date < until && e.amount < 0) commitments -= e.amount;
   commitments = round2(commitments);
   const days = Math.max(1, diffDays(until, today));
-  const safe = round2(liquid - commitments);
-  return { liquid, commitments, safe, perDay: round2(safe / days), days, untilDate: until, payday, avgDaily: fc.avgDaily };
+  const reserved = round2(accts.reduce((sum, a) => sum + (a.minBalance && a.minBalance > 0 ? a.minBalance : 0), 0));
+  const safe = round2(liquid - commitments - reserved);
+  return { liquid, commitments, safe, perDay: round2(safe / days), days, untilDate: until, payday, avgDaily: fc.avgDaily, reserved };
 }
