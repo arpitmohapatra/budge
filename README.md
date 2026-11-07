@@ -1,195 +1,50 @@
-# Budge - Budget & Subscription Tracker PWA
+# Budge — family money
 
-A modern Progressive Web App for tracking your budget and managing subscriptions. Built with React, TypeScript, and Tailwind CSS.
+A local-first budgeting PWA for two people plus a family view. Accounts, credit cards, paydays, bills, budgets, investments and a cash forecast that answers "can we afford it?". Visual language borrowed from Checkpoint (Outfit type, soft blue-grey, dark hero panel, ⌘K).
 
-## Features
+React 18 + TypeScript + Vite · IndexedDB (`idb`) · Lucide icons · hand-rolled SVG charts · `vite-plugin-pwa`. No backend; nothing leaves the device.
 
-- **Budget Tracking**: Keep track of your current balance
-- **Subscription Management**: Add, edit, and manage all your subscriptions
-- **Smart Reminders**: Get in-app alerts for upcoming payments (3 days before)
-- **Offline Support**: Works completely offline with IndexedDB storage
-- **Responsive Design**: Optimized for iOS, Android, and web
-- **Dark Mode**: System-aware dark mode with manual toggle
-- **Privacy First**: All data stored locally on your device
+## What it does
 
-## Tech Stack
+| Area | Details |
+|---|---|
+| **People** | Two profiles + a **Family** view that adds everything together. Switch at the top (sidebar / top bar). |
+| **Accounts** | Checking, savings, cash and **credit cards** with starting balances ("as of today"). Cards track what you owe and credit-limit use. "Update balance" reconciles to your bank with an adjustment entry. |
+| **Card dues** | Add a due *amount + date* and the bank account it comes out of. On the date it's deducted from the bank and applied to the card automatically. One-off bills (e.g. property tax) work the same way. |
+| **Income** | Pay amount + pay days. Default is **twice a month on the 7th & 22nd**; if a pay date falls on a weekend or US federal holiday it is paid on the **last business day before** (Sat 7th → Fri 6th, Sun 22nd → Fri 20th, Monday holiday → the Friday before). Also supports every 2 weeks, weekly, monthly. Paychecks post themselves. |
+| **Recurring bills** | Rent, subscriptions, insurance… weekly → yearly, optional weekend/holiday roll-back, pause/end dates. |
+| **Expenses** | Fast add sheet, **quick log** ("coffee 4.50 yesterday", "+250 bonus", "ATM 100"), ⌘K palette, cash-withdrawal shortcut, transfers (e.g. paying a card early). |
+| **Budgets** | Monthly limit per category, per person (family view sums them). Pace marker, "running hot" / **over budget** states, month history, suggestions from your last 3 months of everyday spending. |
+| **Forecast** | 30d – 6mo projection from current cash + scheduled pay + bills + card dues − your average everyday spending. Lowest point, per-account overdraft warnings, scrub-able chart. |
+| **Can I afford it?** | Enter a future expense + date → Yes / Tight / Not yet, the lowest balance afterwards, the earliest comfortable date, and the most you could spend that day. Save purchases to a plan; they're re-checked as things change. |
+| **Investments** | Per person: holdings with cost basis and current value, "add money" (optionally deducted from an account), "update value", growth chart, allocation donut, gain/loss. |
+| **Home** | "Safe to spend until payday", 60-day sparkline, insights (cash squeeze, budgets, big bills coming, card utilisation…), net worth, upcoming, recent activity. |
 
-- **Frontend**: React 18 + TypeScript
-- **Styling**: Tailwind CSS
-- **Build Tool**: Vite
-- **Storage**: IndexedDB (via idb)
-- **PWA**: Workbox (via vite-plugin-pwa)
-- **Date Management**: date-fns
-- **Deployment**: GitHub Pages
+## How the money math works
 
-## Getting Started
+- **Balances** = starting balance + everything dated on/after the account's "as of" date. Cards are negative (owed). **Card payments are transfers, not expenses**, so spending isn't double counted.
+- **Forecast** starts from checking + cash (savings optional in Settings), adds each scheduled paycheck, subtracts recurring bills and open dues from the account they come out of, and subtracts typical everyday spending (average of the last 30/60/90 days of non-scheduled expenses; overridable per person). A cushion (default $500) turns "yes" into "tight".
+- **Safe to spend** = checking + cash − bills/dues landing before the next payday, spread over the days until then.
+- Scheduled items are posted when the app opens (or the day changes). Paydays/bills missed while it was closed are caught up, once.
 
-### Prerequisites
+## Run it
 
-- Node.js 18 or higher
-- npm or yarn
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/YOUR_USERNAME/budge.git
-cd budge
-```
-
-2. Install dependencies:
 ```bash
 npm install
+npm run dev          # http://localhost:5173/budge/
+npm test             # engine tests: recurrence, pay-day rule, balances, forecast, affordability, budgets
+npm run build        # type-check + production build
 ```
 
-3. Start the development server:
-```bash
-npm run dev
-```
+Deploy: pushes to `main` build and publish to GitHub Pages via `.github/workflows/deploy.yml` (base path `/budge/`). Install from the browser (iOS: Share → Add to Home Screen).
 
-4. Open [http://localhost:5173](http://localhost:5173) in your browser
+## Using it on two phones
 
-## Building for Production
+Data lives in each device's browser storage. To share: export a **Full backup** once and import it on the second device (so the profiles match). After that each person exports **their own data** (Settings → Backup & sharing) and the other imports it — that replaces only that person's numbers. Live sync would need a backend, which isn't included.
 
-```bash
-npm run build
-```
+## Notes
 
-The production build will be created in the `dist` directory.
-
-## Deployment to GitHub Pages
-
-### Automatic Deployment (Recommended)
-
-This project is configured for automatic deployment to GitHub Pages:
-
-1. **Enable GitHub Pages**:
-   - Go to your repository Settings
-   - Navigate to Pages (in the sidebar)
-   - Under "Build and deployment", select "GitHub Actions" as the source
-
-2. **Push to main branch**:
-   - Every push to the `main` branch will automatically trigger a deployment
-   - The GitHub Action workflow will build and deploy your app
-
-3. **Access your app**:
-   - Your app will be available at: `https://YOUR_USERNAME.github.io/budge/`
-
-### Manual Deployment
-
-Alternatively, you can deploy manually:
-
-```bash
-npm run deploy
-```
-
-## Project Structure
-
-```
-budge/
-├── .github/
-│   └── workflows/
-│       └── deploy.yml          # GitHub Actions workflow
-├── favicon/                     # PWA icons and manifest
-├── src/
-│   ├── components/             # React components
-│   │   ├── Onboarding.tsx     # First-time setup
-│   │   ├── Dashboard.tsx      # Main dashboard view
-│   │   ├── SubscriptionList.tsx
-│   │   ├── SubscriptionForm.tsx
-│   │   ├── Header.tsx         # App header with dark mode
-│   │   └── BottomNav.tsx      # Bottom navigation
-│   ├── hooks/                  # Custom React hooks
-│   │   ├── useProfile.ts      # User profile management
-│   │   ├── useSubscriptions.ts # Subscription CRUD
-│   │   └── useAlerts.ts       # Reminder system
-│   ├── db.ts                   # IndexedDB operations
-│   ├── types.ts               # TypeScript types
-│   ├── App.tsx                # Main app component
-│   ├── main.tsx               # App entry point
-│   └── index.css              # Global styles with Tailwind
-├── index.html                  # HTML template
-├── vite.config.ts             # Vite + PWA configuration
-├── tailwind.config.js         # Tailwind configuration
-└── package.json
-
-```
-
-## Features in Detail
-
-### Onboarding Flow
-- First-time users are prompted to enter their name, preferred currency, and current balance
-- All data is stored locally using IndexedDB
-
-### Dashboard
-- Current balance display
-- Upcoming payment alerts (within 3 days)
-- Quick stats (active subscriptions, monthly spend)
-- Next 30 days preview
-
-### Subscription Management
-- Add/Edit/Delete subscriptions
-- Support for daily, weekly, monthly, and yearly billing cycles
-- Category organization
-- Mark as paid functionality (updates next payment date automatically)
-
-### Reminder System
-- Daily check on app open
-- In-app alerts for payments due within 3 days
-- Color-coded urgency (red: today, yellow: tomorrow, blue: 2-3 days)
-- Dismissible alerts
-
-### Dark Mode
-- System preference detection
-- Manual toggle in header
-- Persistent across sessions
-
-## PWA Features
-
-- **Installable**: Add to home screen on iOS and Android
-- **Offline**: Works without internet connection
-- **Fast**: Optimized loading with service worker caching
-- **App-like**: Standalone display mode
-
-### Installing on Devices
-
-**iOS (Safari)**:
-1. Tap the Share button
-2. Scroll down and tap "Add to Home Screen"
-3. Tap "Add"
-
-**Android (Chrome)**:
-1. Tap the menu (three dots)
-2. Tap "Install app" or "Add to Home screen"
-
-**Desktop (Chrome)**:
-1. Click the install icon in the address bar
-2. Click "Install"
-
-## Browser Support
-
-- Chrome/Edge 90+
-- Safari 15+
-- Firefox 90+
-- iOS Safari 15+
-- Chrome Android 90+
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-MIT License - feel free to use this project for personal or commercial purposes.
-
-## Privacy
-
-Budge respects your privacy:
-- All data is stored locally on your device using IndexedDB
-- No data is sent to any server
-- No tracking or analytics
-- Works completely offline
-
-## Support
-
-If you encounter any issues or have questions, please [open an issue](https://github.com/YOUR_USERNAME/budge/issues) on GitHub.
+- The pay-day rule uses US federal holidays.
+- Investment values are entered by you (no market feed), so everything works offline.
+- Data lives in IndexedDB database `budge-v2`; the older v1 database (`budge-db`) is left untouched.
+- **Settings → Load sample data** fills in a realistic household to explore; **Erase all data** clears it.

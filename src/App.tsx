@@ -1,244 +1,113 @@
-import { useState, useEffect } from 'react';
-import { Onboarding } from './components/Onboarding';
-import { EnhancedDashboard } from './components/EnhancedDashboard';
-import { SubscriptionList } from './components/SubscriptionList';
-import { SubscriptionForm } from './components/SubscriptionForm';
-import { TransactionsView } from './components/TransactionsView';
-import { AnalyticsView } from './components/AnalyticsView';
-import { BudgetCard } from './components/BudgetCard';
-import { Header } from './components/Header';
-import { BottomNav } from './components/BottomNav';
-import { useProfile } from './hooks/useProfile';
-import { useSubscriptions } from './hooks/useSubscriptions';
-import { useAlerts } from './hooks/useAlerts';
-import { useTransactions } from './hooks/useTransactions';
-import { useCategories } from './hooks/useCategories';
-import { useBudgets } from './hooks/useBudgets';
-import { useAnalytics } from './hooks/useAnalytics';
-import { Subscription, Transaction, TransactionFilters } from './types';
-import { addTransaction, generateId } from './db';
+import { useEffect, useMemo } from 'react';
+import { CalendarClock, Ellipsis, Gauge, Landmark, LayoutGrid, LineChart, ListChecks, Plus, Search, Settings as Cog, TrendingUp } from 'lucide-react';
+import { ModalHost } from './forms';
+import { budgetRows } from './lib/ledger';
+import { monthOf } from './lib/dates';
+import { AppProvider, useApp } from './lib/store';
+import Accounts from './pages/Accounts';
+import Activity from './pages/Activity';
+import Bills from './pages/Bills';
+import Budgets from './pages/Budgets';
+import Forecast from './pages/Forecast';
+import Home from './pages/Home';
+import Invest from './pages/Invest';
+import Onboarding from './pages/Onboarding';
+import Settings from './pages/Settings';
+import { Palette } from './ui/Palette';
+import { Confetti, ToastHost, WhoSwitch } from './ui/kit';
+import { navigate, usePath } from './ui/router';
 
-type View = 'dashboard' | 'transactions' | 'subscriptions' | 'analytics';
+const NAV = [
+  { to: '/', label: 'Home', icon: LayoutGrid },
+  { to: '/activity', label: 'Activity', icon: ListChecks },
+  { to: '/budgets', label: 'Budgets', icon: Gauge },
+  { to: '/forecast', label: 'Forecast', icon: LineChart },
+  { to: '/accounts', label: 'Accounts', icon: Landmark },
+  { to: '/bills', label: 'Bills & income', icon: CalendarClock },
+  { to: '/invest', label: 'Investments', icon: TrendingUp },
+] as const;
 
-function App() {
-  const { profile, loading: profileLoading, createProfile } = useProfile();
-  const {
-    subscriptions,
-    loading: subsLoading,
-    createSubscription,
-    editSubscription,
-    removeSubscription,
-    markAsPaid,
-  } = useSubscriptions();
-  const { alerts, dismissAlert } = useAlerts(subscriptions);
-  const { categories, loading: categoriesLoading, initializeDefaultCategories } = useCategories();
-  useBudgets();
-  const { summary, categorySpending } = useAnalytics();
+function Shell() {
+  const { state, scope, today, openModal, setPalette } = useApp();
+  const path = usePath();
 
-  const [filters, setFilters] = useState<TransactionFilters>({});
-  const { transactions, createTransaction, editTransaction, removeTransaction } = useTransactions(filters);
-
-  const [currentView, setCurrentView] = useState<View>('dashboard');
-  const [showSubForm, setShowSubForm] = useState(false);
-  const [editingSubId, setEditingSubId] = useState<string | null>(null);
-
-  const loading = profileLoading || subsLoading || categoriesLoading;
-
-  // Initialize default categories on first load
   useEffect(() => {
-    if (profile && categories.length === 0 && !categoriesLoading) {
-      initializeDefaultCategories();
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalette(true); return; }
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.querySelector('dialog[open]') || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key.toLowerCase() === 'n') { e.preventDefault(); openModal('tx'); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [openModal, setPalette]);
+
+  useEffect(() => { window.scrollTo({ top: 0 }); document.getElementById('view')?.focus({ preventScroll: true }); }, [path]);
+
+  const overCount = useMemo(() => budgetRows(state, scope, monthOf(today), today).filter((r) => r.state === 'over').length, [state, scope, today]);
+
+  if (!state.onboarded) return <Onboarding />;
+
+  const page = (() => {
+    switch (path) {
+      case '/activity': return <Activity />;
+      case '/budgets': return <Budgets />;
+      case '/forecast': return <Forecast />;
+      case '/accounts': return <Accounts />;
+      case '/bills': return <Bills />;
+      case '/invest': return <Invest />;
+      case '/settings': return <Settings />;
+      default: return <Home />;
     }
-  }, [profile, categories.length, categoriesLoading]);
+  })();
 
-  // Show onboarding if no profile
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <Onboarding
-        onComplete={(data) => {
-          createProfile(data);
-        }}
-      />
-    );
-  }
-
-  const handleAddTransaction = () => {
-    setCurrentView('transactions');
-  };
-
-  const handleAddSubscription = () => {
-    setEditingSubId(null);
-    setShowSubForm(true);
-  };
-
-  const handleEditSubscription = (id: string) => {
-    setEditingSubId(id);
-    setShowSubForm(true);
-  };
-
-  const handleSaveSubscription = async (data: Omit<Subscription, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (editingSubId) {
-      await editSubscription(editingSubId, data);
-    } else {
-      await createSubscription(data);
-    }
-    setShowSubForm(false);
-    setEditingSubId(null);
-  };
-
-  const handleDeleteSubscription = async () => {
-    if (editingSubId) {
-      if (confirm('Are you sure you want to delete this subscription?')) {
-        await removeSubscription(editingSubId);
-        setShowSubForm(false);
-        setEditingSubId(null);
-      }
-    }
-  };
-
-  const handleMarkAsPaid = async (id: string) => {
-    const subscription = subscriptions.find(s => s.id === id);
-    if (subscription) {
-      // Create transaction record
-      await addTransaction({
-        id: generateId(),
-        type: 'subscription',
-        amount: subscription.amount,
-        description: `${subscription.name} - ${subscription.billingCycle} payment`,
-        category: subscription.category,
-        subscriptionId: id,
-        date: new Date(),
-        createdAt: new Date(),
-      });
-
-      // Update next payment date
-      await markAsPaid(id);
-    }
-  };
-
-  const handleSaveTransaction = (data: Omit<Transaction, 'id' | 'createdAt'>) => {
-    createTransaction(data);
-  };
-
-  const handleEditTransaction = (id: string, data: Partial<Transaction>) => {
-    editTransaction(id, data);
-  };
-
-  const handleDeleteTransaction = (id: string) => {
-    if (confirm('Are you sure you want to delete this transaction?')) {
-      removeTransaction(id);
-    }
-  };
-
-  const editingSubscription = editingSubId
-    ? subscriptions.find(s => s.id === editingSubId)
-    : undefined;
+  const mobile = [NAV[0], NAV[1], NAV[2], NAV[3]];
+  const moreActive = !mobile.some((n) => n.to === path);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-16">
-      <Header title="Budge" />
-
-      <main className="container mx-auto px-4 py-6 max-w-4xl">
-        {currentView === 'dashboard' && (
-          <EnhancedDashboard
-            profile={profile}
-            subscriptions={subscriptions}
-            alerts={alerts}
-            monthlySummary={summary}
-            onDismissAlert={dismissAlert}
-            onAddTransaction={handleAddTransaction}
-            onAddSubscription={handleAddSubscription}
-            onEditSubscription={handleEditSubscription}
-          />
-        )}
-
-        {currentView === 'transactions' && (
-          <TransactionsView
-            transactions={transactions}
-            categories={categories}
-            currency={profile.currency}
-            onSave={handleSaveTransaction}
-            onEdit={handleEditTransaction}
-            onDelete={handleDeleteTransaction}
-            filters={filters}
-            onFilterChange={setFilters}
-          />
-        )}
-
-        {currentView === 'subscriptions' && (
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">All Subscriptions</h2>
-              <button onClick={handleAddSubscription} className="btn-primary text-sm py-2 px-4">
-                + Add
-              </button>
-            </div>
-            <SubscriptionList
-              subscriptions={subscriptions}
-              currency={profile.currency}
-              onEdit={handleEditSubscription}
-              onMarkAsPaid={handleMarkAsPaid}
-            />
+    <>
+      <div className="app">
+        <nav className="sidebar" aria-label="Main">
+          <a className="brand" href="#/"><img className="brand-mark" src={`${import.meta.env.BASE_URL}favicon/android-chrome-192x192.png`} alt="" /><span>Budge</span></a>
+          <WhoSwitch variant="side" />
+          <button type="button" className="palette-btn" onClick={() => setPalette(true)}><Search /><span>Search or log…</span><span className="kbd">⌘K</span></button>
+          <div className="nav-links">
+            {NAV.map((n) => (
+              <a key={n.to} href={`#${n.to}`} aria-current={path === n.to || (n.to === '/' && !NAV.some((x) => x.to === path) && path !== '/settings') ? 'page' : undefined}>
+                <n.icon /> {n.label}{n.to === '/budgets' && overCount > 0 && <span className="badge">{overCount}</span>}
+              </a>
+            ))}
           </div>
-        )}
-
-        {currentView === 'analytics' && (
-          <div className="space-y-6">
-            <AnalyticsView summary={summary} currency={profile.currency} />
-
-            {/* Budget Overview */}
-            {categorySpending.length > 0 && (
-              <div>
-                <h2 className="text-xl font-bold mb-4">Budget Overview</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {categorySpending.map((spending) => {
-                    const category = categories.find(c => c.id === spending.categoryId);
-                    if (!category) return null;
-
-                    return (
-                      <BudgetCard
-                        key={spending.categoryId}
-                        category={category}
-                        budgetAmount={spending.budgetLimit}
-                        spentAmount={spending.amount}
-                        currency={profile.currency}
-                        transactionCount={spending.transactionCount}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+          <div className="sidebar-foot">
+            <button type="button" className="nav-btn" onClick={() => navigate('/settings')}><Cog /> Settings & backup</button>
+            <p className="local-note">Everything lives on this device. Back up from Settings.</p>
           </div>
-        )}
-      </main>
+        </nav>
 
-      <BottomNav currentView={currentView} onViewChange={setCurrentView} />
+        <main id="view" tabIndex={-1}>
+          <div className="topbar"><a className="brand" href="#/"><img className="brand-mark" src={`${import.meta.env.BASE_URL}favicon/android-chrome-192x192.png`} alt="" /><span>Budge</span></a><WhoSwitch variant="top" /></div>
+          {page}
+        </main>
+      </div>
 
-      {showSubForm && (
-        <SubscriptionForm
-          subscription={editingSubscription}
-          onSave={handleSaveSubscription}
-          onCancel={() => {
-            setShowSubForm(false);
-            setEditingSubId(null);
-          }}
-          onDelete={editingSubId ? handleDeleteSubscription : undefined}
-        />
-      )}
-    </div>
+      {!['/forecast', '/settings', '/invest'].includes(path) && <button type="button" className="fab" onClick={() => openModal('tx')} aria-label="Add expense"><Plus /> <span>Add</span></button>}
+
+      <nav className="bottom-nav" aria-label="Main">
+        {mobile.map((n) => (
+          <a key={n.to} href={`#${n.to}`} aria-current={path === n.to ? 'page' : undefined}><n.icon />{n.label}</a>
+        ))}
+        <button type="button" onClick={() => openModal('more')} style={moreActive ? { color: 'var(--ink)', fontWeight: 600 } : undefined}><Ellipsis />More</button>
+      </nav>
+
+      <ModalHost />
+      <Palette />
+      <ToastHost />
+      <Confetti />
+      <div className="grain" aria-hidden="true" />
+    </>
   );
 }
 
-export default App;
+export default function App() {
+  return <AppProvider><Shell /></AppProvider>;
+}
